@@ -1,33 +1,28 @@
 const express = require('express');
 const router = express.Router();
-const { Flete, User } = require('../config/config');
+const fleteService = require('../services/fleteService');
+const { addFlete } = require('../services/fleteService');
+const { generateToken } = require('../services/usersService');
 
 router.post('/fletes', async (req, res) => {
     try {
         const newFlete = req.body;
 
-        const userDoc = await User.doc(newFlete.userId).get();
-        if (!userDoc.exists) {
-            res.status(404).json({ error: 'User not found' });
-            return;
-        }
+        const token = req.method === 'POST' ? generateToken(newFlete.userId) : null;
 
-        const fleteRef = await Flete.add(newFlete);
-        const fleteId = fleteRef.id;
+        const flete = await addFlete(newFlete);
 
-        await Flete.doc(fleteId).update({ id: fleteId });
-
-        res.send({ msg: 'Flete added successfully', flete: { id: fleteId, ...newFlete } });
+        res.send({ msg: 'Flete added successfully', flete, token });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
+
 router.get('/fletes', async (req, res) => {
     try {
-        const fletesSnapshot = await Flete.get();
-        const fletes = fletesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const fletes = await fleteService.getFletes();
         res.send({ fletes });
     } catch (error) {
         console.error(error);
@@ -35,16 +30,10 @@ router.get('/fletes', async (req, res) => {
     }
 });
 
-
 router.get('/fletes/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const fleteDoc = await Flete.doc(id).get();
-        if (!fleteDoc.exists) {
-            res.status(404).json({ error: 'Flete not found' });
-            return;
-        }
-        const flete = { id: fleteDoc.id, ...fleteDoc.data() };
+        const flete = await fleteService.getFleteById(id);
         res.send({ flete });
     } catch (error) {
         console.error(error);
@@ -64,7 +53,7 @@ router.put('/fletes/:id', async (req, res) => {
             throw new Error('Invalid JSON data in the request body');
         }
 
-        await Flete.doc(id).update(updatedFlete);
+        await fleteService.updateFlete(id, updatedFlete);
 
         res.send({ msg: 'Flete updated successfully', flete: { id, ...updatedFlete } });
     } catch (error) {
@@ -73,19 +62,15 @@ router.put('/fletes/:id', async (req, res) => {
     }
 });
 
-
-
-
 router.delete('/fletes/:id', async (req, res) => {
     try {
         const { id } = req.params;
-
-        await Flete.doc(id).delete();
-
+        await fleteService.deleteFlete(id);
         res.send({ msg: 'Flete deleted successfully' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
 module.exports = router;

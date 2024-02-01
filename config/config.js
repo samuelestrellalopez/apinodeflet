@@ -3,6 +3,8 @@ require('firebase/compat/database');
 require('firebase/compat/storage');
 const crypto = require('crypto');
 
+
+
 module.exports = {
     JWT_SECRET: crypto.randomBytes(32).toString('hex'),  
 };

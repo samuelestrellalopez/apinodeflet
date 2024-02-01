@@ -32,14 +32,13 @@ router.post('/users', upload.single('photo'), async (req, res) => {
 
 
 router.get('/users', async (req, res) => {
-    try {
-        const { page = 1, pageSize = 8 } = req.query;
-        const users = await userService.getUsers(page, pageSize);
-        res.send({ users });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
-      }
+  try {
+    const users = await userService.getUsers();
+    res.send({ users });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 

@@ -45,13 +45,9 @@ async function addUser(userData, file) {
 
 
 
-async function getUsers(page, pageSize) {
+async function getUsers() {
   try {
-    const usersSnapshot = await User.orderByChild('name')  
-      .limitToFirst(pageSize * 1)
-      .startAt(pageSize * (page - 1))
-      .once('value');
-
+    const usersSnapshot = await User.orderByChild('name').once('value');
     const users = [];
 
     usersSnapshot.forEach((userSnapshot) => {
