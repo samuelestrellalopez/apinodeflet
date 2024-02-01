@@ -1,5 +1,5 @@
 const firebase = require('firebase/compat/app');
-require('firebase/compat/database');  // Cambiado a Realtime Database
+require('firebase/compat/database');  
 require('firebase/compat/storage');
 const crypto = require('crypto');
 
@@ -16,8 +16,7 @@ module.exports = {
   const firebaseConfig = {
     apiKey: "AIzaSyAD6HS5Hx9mVJrxgH0rbpQ2lU4cvCO_NGg",
     authDomain: "apiflet.firebaseapp.com",
-    databaseURL: "https://apiflet-default-rtdb.firebaseio.com/", // Cambiado a la URL de Realtime Database
-    projectId: "apiflet",
+    databaseURL: "https://apiflet-default-rtdb.firebaseio.com/", 
     storageBucket: "apiflet.appspot.com",
     messagingSenderId: "364633043807",
     appId: "1:364633043807:web:fdf0fb9e70f1f298833cea",
@@ -31,10 +30,10 @@ module.exports = {
     console.error('Firebase initialization error:', error.stack);
 }
 
-const db = firebase.database();  // Cambiado a Realtime Database
-const Driver = db.ref("Drivers");  // Cambiado a Realtime Database
-const Flete = db.ref("Fletes");    // Cambiado a Realtime Database
-const User = db.ref("Users");      // Cambiado a Realtime Database
+const db = firebase.database();  
+const Driver = db.ref("Drivers");  
+const Flete = db.ref("Fletes");    
+const User = db.ref("Users");      
 
 const storage = firebase.storage();
 

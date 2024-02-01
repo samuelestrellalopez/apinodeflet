@@ -67,7 +67,7 @@ async function getUsers(page, pageSize) {
 
 async function getUserById(userId) {
   try {
-    const userSnapshot = await User.child(userId).once('value');  // Cambiado a Realtime Database
+    const userSnapshot = await User.child(userId).once('value');  
 
     if (!userSnapshot.exists()) {
       throw new Error('User not found');

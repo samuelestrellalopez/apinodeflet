@@ -32,10 +32,8 @@ async function getDrivers() {
 
 async function updateDriver(id, updatedFields) {
   try {
-      // Verifica si el conductor existe antes de intentar actualizarlo
       const existingDriver = await getDriverById(id);
       if (existingDriver) {
-          // Actualiza solo los campos proporcionados en el objeto actualizado
           await Driver.child(id).update(updatedFields);
       } else {
           throw new Error('Driver not found');
