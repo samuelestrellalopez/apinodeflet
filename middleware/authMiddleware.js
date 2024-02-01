@@ -1,11 +1,10 @@
-
 const jwt = require('jsonwebtoken');
 
 function authMiddleware(req, res, next) {
   const { authorization } = req.headers;
   const token = authorization && authorization.split(' ')[1];
 
-  if (!token) {
+  if (!token && req.method !== 'PUT') {
     if (req.method === 'GET' || req.method === 'DELETE') {
       req.user = null;
       return next();
@@ -15,8 +14,10 @@ function authMiddleware(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded.userId;
+    if (token) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.user = decoded.userId;
+    }
     next();
   } catch (error) {
     res.status(401).json({ error: 'Unauthorized: Invalid token' });

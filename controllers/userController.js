@@ -53,17 +53,22 @@ router.get('/users/:id', authMiddleware, async (req, res) => {
     }
   });
   
- router.put('/users/:id', authMiddleware, async (req, res) => {
+// usersController.js
+
+router.put('/users/:id', async (req, res) => {
   const userId = req.params.id;
   const updatedUserData = req.body;
   try {
-    const updatedUser = await userService.updateUser(userId, updatedUserData);
-    res.json(updatedUser);
+    const result = await userService.updateUser(userId, updatedUserData);
+    res.json(result);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 });
+
+
+
 
   router.delete('/users/:id', authMiddleware, async (req, res) => {
     const userId = req.params.id;

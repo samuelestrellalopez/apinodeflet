@@ -76,6 +76,8 @@ async function getUserById(userId) {
   }
 }
 
+
+
 async function updateUser(userId, updatedUserData) {
   try {
     const userSnapshot = await User.child(userId).once('value');
@@ -84,17 +86,22 @@ async function updateUser(userId, updatedUserData) {
       throw new Error('User not found');
     }
 
-    const user = { id: userSnapshot.key, ...userSnapshot.val() };
+    // Obtén el usuario actual
+    const currentUser = userSnapshot.val();
 
-    Object.assign(user, updatedUserData);
+    // Actualiza los campos que se deben cambiar
+    const updatedUser = { ...currentUser, ...updatedUserData };
 
-    await User.child(userId).update(user);
+    // Actualiza el usuario en la base de datos
+    await User.child(userId).update(updatedUser);
 
-    return user;
+    return { message: 'User updated successfully', user: updatedUser };
   } catch (error) {
-    throw error;
+    return { message: 'User not updated', error: error.message };
   }
 }
+
+
 
 
 
