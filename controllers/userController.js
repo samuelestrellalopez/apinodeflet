@@ -28,8 +28,7 @@ router.post('/users', upload.single('photo'), async (req, res) => {
 
 
 
-//holaaaa
-
+//holaaaaaaaaa2
 
 router.get('/users', async (req, res) => {
   try {
@@ -53,7 +52,6 @@ router.get('/users/:id', authMiddleware, async (req, res) => {
     }
   });
   
-// usersController.js
 
 router.put('/users/:id', async (req, res) => {
   const userId = req.params.id;

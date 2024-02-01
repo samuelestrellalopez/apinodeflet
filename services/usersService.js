@@ -86,13 +86,10 @@ async function updateUser(userId, updatedUserData) {
       throw new Error('User not found');
     }
 
-    // Obtén el usuario actual
     const currentUser = userSnapshot.val();
 
-    // Actualiza los campos que se deben cambiar
     const updatedUser = { ...currentUser, ...updatedUserData };
 
-    // Actualiza el usuario en la base de datos
     await User.child(userId).update(updatedUser);
 
     return { message: 'User updated successfully', user: updatedUser };
