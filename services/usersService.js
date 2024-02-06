@@ -20,27 +20,35 @@
     }
   }
 
-  async function addUser(userData, file) {
-    try {
-      const newUser = userData ? userData : {};
-
-      if (file) {
-        const photoName = `users/${Date.now()}_${file.originalname}`;
-        newUser.photo = await uploadPhoto(file.buffer, photoName);
-      }
-
-      const userRef = await User.push();
-      const userId = userRef.key;
-
-      await User.child(userId).set({ ...newUser, id: userId });
-
-      const token = generateToken(userId);
-
-      return { user: { id: userId, ...newUser }, token };
-    } catch (error) {
-      throw error;
+async function addUser(userData, file) {
+  try {
+    if (!userData) {
+      throw new Error('Se requieren datos de usuario para agregar un nuevo usuario');
     }
+
+    const newUser = { ...userData }; // Clonar los datos de usuario para evitar modificaciones no deseadas
+
+    if (file) {
+      const photoName = `users/${Date.now()}_${file.originalname}`;
+      newUser.photo = await uploadPhoto(file.buffer, photoName);
+    }
+
+    // Verificar si el usuario ya tiene un ID proporcionado
+    const userId = newUser.id || (await User.push()).key;
+
+    // Agregar el ID del usuario a los datos del nuevo usuario
+    newUser.id = userId;
+
+    await User.child(userId).set(newUser);
+
+    const token = generateToken(userId);
+
+    return { user: newUser, token };
+  } catch (error) {
+    throw error;
   }
+}
+
 
 
 
