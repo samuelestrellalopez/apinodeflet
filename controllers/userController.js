@@ -28,7 +28,6 @@ router.post('/users', upload.single('photo'), async (req, res) => {
 
 
 
-//holaaaaaaaaa2
 
 router.get('/users', async (req, res) => {
   try {

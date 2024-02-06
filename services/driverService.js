@@ -29,7 +29,6 @@ async function getDrivers() {
     return Object.keys(driversSnapshot.val() || {}).map((id) => ({ id, ...driversSnapshot.val()[id] }));
 }
 
-
 async function updateDriver(id, updatedFields) {
   try {
       const existingDriver = await getDriverById(id);
@@ -45,11 +44,6 @@ async function updateDriver(id, updatedFields) {
 
 
 
-
-
-
-
-
 async function getDriverById(driverId) {
   const driverDoc = await Driver.child(driverId).once('value');
 
@@ -59,13 +53,6 @@ async function getDriverById(driverId) {
 
   return { id: driverDoc.key, ...driverDoc.val() };
 }
-
-
-
-
-
-
-
 
 
 async function deleteDriver(id) {
