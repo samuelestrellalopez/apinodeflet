@@ -10,7 +10,7 @@ module.exports = {
 };
 
 module.exports = {
-    stripeSecretKey: 'sk_test_51OcJloAIqkgFr3utG0nNfFTrxnoiGKiU4XpCyqIfJlEXvJmkmEQnkf5JDELtZscKplHKwJyhMfQsyvvfQI2hPwE100mbj5IKj7',
+    stripeSecretKey: 'sk_test_51Oc9WPHDirRzPkGPos2BoqHkUPjs9zZg0Za4IgAAkBIyGDtj0qK1HROr5z3cc2j0XW8KVBOeX6dC2OCpWUK374KF0067zscYfW',
     stripePublicKey: 'pk_test_51OcJloAIqkgFr3utXpc2XaMyAIP306DVAZoaDw2IjGk3ZOwjUZ5p8w3CIvHH6UxpLSOLn22gTSEejSetbQlg2vpp00tlbZKxmg',
   };
   

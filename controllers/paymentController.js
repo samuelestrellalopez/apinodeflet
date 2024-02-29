@@ -1,115 +1,52 @@
-// controllers/paymentController.js
 const express = require('express');
 const router = express.Router();
-const stripe = require('stripe')('sk_test_51OcJloAIqkgFr3utG0nNfFTrxnoiGKiU4XpCyqIfJlEXvJmkmEQnkf5JDELtZscKplHKwJyhMfQsyvvfQI2hPwE100mbj5IKj7');  // Importa la librería de Stripe
-const csrf = require('csurf');
+const PaymentService = require('../services/paymentService');
 
-const { Flete, User } = require('../config/config');
-const csrfProtection = csrf({ cookie: true });
 
-router.get('/payments', async ( res) => {
-    try {
-        const paymentsSnapshot = await Flete.get();
-        const payments = paymentsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        res.send({ payments });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Error al obtener los pagos' });
-    }
-});
 
-router.get('/payments/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const paymentDoc = await Flete.doc(id).get();
-        if (!paymentDoc.exists) {
-            res.status(404).json({ success: false, message: 'Pago no encontrado' });
-            return;
-        }
-        const payment = { id: paymentDoc.id, ...paymentDoc.data() };
-        res.send({ payment });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Error al obtener el pago' });
-    }
-});
-
-router.put('/payments/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { body } = req;
-
-        let updatedPayment;
-        try {
-            updatedPayment = JSON.parse(body);
-        } catch (error) {
-            throw new Error('Invalid JSON data in the request body');
-        }
-
-        await Flete.doc(id).update(updatedPayment);
-
-        res.send({ success: true, message: 'Pago actualizado correctamente', payment: { id, ...updatedPayment } });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Error al actualizar el pago' });
-    }
-});
-
-router.delete('/payments/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        await Flete.doc(id).delete();
-
-        res.send({ success: true, message: 'Pago eliminado correctamente' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Error al eliminar el pago' });
-    }
+router.post('/generate-token', async (req, res) => {
+  try {
+    const { cardData, userEmail } = req.body; // Se espera que la solicitud incluya los datos de la tarjeta y el correo electrónico del usuario
+    const token = await PaymentService.generateTokenWithCardData(cardData, userEmail); // Utiliza el servicio para generar el token con los datos de la tarjeta
+    res.status(200).json({ token }); // Devuelve el token generado en la respuesta
+  } catch (error) {
+    console.error("Error en la solicitud de generación de token:", error);
+    res.status(500).json({ error: "Error en la solicitud de generación de token" }); // Si hay algún error, devuelve un error interno del servidor
+  }
 });
 
 
+router.post('/generate_token2', async (req, res) => {
+  try {
+    const { token, userEmail } = req.body; // Incluye userEmail en la desestructuración
+    const tokenId = await PaymentService.generateToken({ token, userEmail }); // Pasa el objeto completo al servicio
+    res.json({ success: true, tokenId: tokenId   });
+  } catch (error) {
+    console.error("Error al generar el token:", error);
+    res.status(500).json({ success: false, error: 'Failed to generate token' });
+  }
+});
 
-router.post('/process-payment', csrfProtection, async (req, res) => {
-    try {
-        const { token, offerRate, fleteId, userId } = req.body;
 
-        const userDoc = await User.doc(userId).get();
-        if (!userDoc.exists) {
-            res.status(404).json({ success: false, message: 'Usuario no encontrado' });
-            return;
-        }
+router.post('/add_payment_method', async (req, res) => {
+  try {
+    const { token, userEmail } = req.body;
+    const customerId = await PaymentService.addPaymentMethod(token, userEmail); // Actualizado para capturar el ID del cliente
+    res.json({ success: true, customerId: customerId });
+  } catch (error) {
+    console.error("Error al agregar método de pago:", error);
+    res.status(500).json({ success: false, error: 'Failed to add payment method' });
+  }
+});
 
-        const fleteDoc = await Flete.doc(fleteId).get();
-        if (!fleteDoc.exists) {
-            res.status(404).json({ success: false, message: 'Flete no encontrado' });
-            return;
-        }
-
-        const paymentIntent = await stripe.paymentIntents.create({
-            amount: offerRate * 100, 
-            currency: 'usd',
-            payment_method: token,
-            confirm: true,
-        });
-
-        const transactionData = {
-            date: new Date(),
-            amount: offerRate,
-            paymentId: paymentIntent.id,
-            userId: userId,
-            fleteId: fleteId,
-        };
-
-        const fleteRef = Flete.doc(fleteId);
-        const transactionCollectionRef = fleteRef.collection('transactions');
-        await transactionCollectionRef.add(transactionData);
-
-        res.json({ success: true, message: 'Pago procesado correctamente' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Error al procesar el pago' });
-    }
+router.get('/payment-methods/:userEmail', async (req, res) => {
+  try {
+    const userEmail = req.params.userEmail;
+    const paymentMethods = await PaymentService.listPaymentMethods(userEmail);
+    res.json(paymentMethods);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

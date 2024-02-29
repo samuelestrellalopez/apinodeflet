@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Payment Form</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Stripe Payment Form</h5>
+                        <form id="payment-form">
+                            <div class="form-group">
+                                <label for="cardNumber">Card Number</label>
+                                <div id="cardNumber" class="form-control"></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="col">
+                                    <label for="cardExpiry">Expiration Date</label>
+                                    <div id="cardExpiry" class="form-control"></div>
+                                </div>
+                                <div class="col">
+                                    <label for="cardCvc">CVC</label>
+                                    <div id="cardCvc" class="form-control"></div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary mt-3">Submit</button>
+                        </form>
+                        <div id="message" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        
+        $(document).ready(function () {
+            var stripe = Stripe('pk_test_51Oc9WPHDirRzPkGPs7RVgxaLXz7ZEpmeULsvZQsk5xDhtFPST7ke5TDCH03H444ijUW5xFcIt5R6YUSLEctCxlzG00ASdfAHZx');
+            var elements = stripe.elements();
+
+            var cardNumber = elements.create('cardNumber', {
+                placeholder: 'Enter card number'
+            });
+            cardNumber.mount('#cardNumber');
+
+            var cardExpiry = elements.create('cardExpiry', {
+                placeholder: 'MM/YY'
+            });
+            cardExpiry.mount('#cardExpiry');
+
+            var cardCvc = elements.create('cardCvc', {
+                placeholder: 'CVC'
+            });
+            cardCvc.mount('#cardCvc');
+
+            var form = document.getElementById('payment-form');
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                stripe.createToken(cardNumber).then(function (result) {
+                    if (result.error) {
+                        var errorElement = document.getElementById('message');
+                        errorElement.textContent = result.error.message;
+                    } else {
+                        var token = result.token.id;
+                        var messageElement = document.getElementById('message');
+                        messageElement.textContent = 'Token: ' + token;
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
