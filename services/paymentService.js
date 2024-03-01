@@ -33,26 +33,6 @@ const PaymentService = {
   
   
 
-  addPaymentMethod: async (token, userEmail) => {
-    try {
-      // Busca el cliente existente con el correo electrónico proporcionado
-      const customers = await stripe.customers.list({ email: userEmail });
-      const existingCustomer = customers.data[0]; // Tomamos el primer cliente con el correo electrónico proporcionado
-      
-      // Si no se encontró ningún cliente existente, lanzamos un error
-      if (!existingCustomer) {
-        throw new Error("No se encontró ningún cliente con el correo electrónico proporcionado.");
-      }
-  
-      // Agrega la fuente de pago al cliente existente
-      const updatedCustomer = await stripe.customers.createSource(existingCustomer.id, { source: token.id });
-  
-      console.log("Customer updated with new payment method:", updatedCustomer);
-    } catch (error) {
-      console.error("Error al agregar método de pago:", error);
-      throw error;
-    }
-  },
   
 
   listPaymentMethods: async (userEmail) => {
@@ -93,21 +73,6 @@ const PaymentService = {
 
 
 
-generateTokenWithCardData: async (cardData, userEmail) => {
-  try {
-    // Primero creamos el token utilizando los datos de la tarjeta
-    const token = await PaymentService.createToken(cardData);
-    
-    // Luego agregamos el método de pago al cliente asociado al correo electrónico proporcionado
-    await PaymentService.addPaymentMethod(token, userEmail);
-    
-    // Devolvemos el ID del token generado
-    return token.id;
-  } catch (error) {
-    console.error("Error al generar el token con los datos de la tarjeta:", error);
-    throw error;
-  }
-}
 }
 
 
