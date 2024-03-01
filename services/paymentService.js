@@ -66,6 +66,16 @@ const PaymentService = {
       throw error;
     }
   },
+  deletePaymentMethod: async (paymentMethodId) => {
+    try {
+      await stripe.paymentMethods.detach(paymentMethodId);
+      console.log("Payment method deleted successfully");
+    } catch (error) {
+      console.error("Error deleting payment method:", error);
+      throw error;
+    }
+  }
+};
 
 
 
@@ -73,7 +83,6 @@ const PaymentService = {
 
 
 
-}
 
 
 module.exports = PaymentService;

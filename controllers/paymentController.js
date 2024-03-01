@@ -53,4 +53,19 @@ router.post('/generate_tokent', async (req, res) => {
     }
 });
 
+
+router.delete('/payment-methods/:paymentMethodId', async (req, res) => {
+  try {
+    const paymentMethodId = req.params.paymentMethodId;
+
+    // Llamar al servicio para eliminar el método de pago
+    await PaymentService.deletePaymentMethod(paymentMethodId);
+
+    res.status(200).json({ message: 'Payment method deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting payment method:', error);
+    res.status(500).json({ error: 'Error deleting payment method' });
+  }
+});
+
 module.exports = router;
