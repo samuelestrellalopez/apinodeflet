@@ -6,7 +6,7 @@ const PaymentService = {
   
   generateToken: async (data) => {
     try {
-      const { token, userEmail } = data; // Extraer el token de la tarjeta y el correo electrónico
+      const { token, userEmail } = data; 
   
       const existingCustomers = await stripe.customers.list({ email: userEmail });
   

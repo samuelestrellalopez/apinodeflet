@@ -6,11 +6,11 @@ const stripe = require('stripe')('pk_test_51Oc9WPHDirRzPkGPs7RVgxaLXz7ZEpmeULsvZ
 
 
 
-
+//Envia el token junto con el email y lo registra en el cliente
 router.post('/generate_token2', async (req, res) => {
   try {
-    const { token, userEmail } = req.body; // Incluye userEmail en la desestructuración
-    const tokenId = await PaymentService.generateToken({ token, userEmail }); // Pasa el objeto completo al servicio
+    const { token, userEmail } = req.body; 
+    const tokenId = await PaymentService.generateToken({ token, userEmail }); 
     res.json({ success: true, tokenId: tokenId   });
   } catch (error) {
     console.error("Error al generar el token:", error);
@@ -31,6 +31,9 @@ router.get('/payment-methods/:userEmail', async (req, res) => {
   }
 });
 
+
+
+//Genera el token para guardar los datos de la tarjeta
 router.post('/generate_tokent', async (req, res) => {
     try {
         const { cardNumber, cardExpiry, cardCvc } = req.body;
@@ -58,7 +61,6 @@ router.delete('/payment-methods/:paymentMethodId', async (req, res) => {
   try {
     const paymentMethodId = req.params.paymentMethodId;
 
-    // Llamar al servicio para eliminar el método de pago
     await PaymentService.deletePaymentMethod(paymentMethodId);
 
     res.status(200).json({ message: 'Payment method deleted successfully' });

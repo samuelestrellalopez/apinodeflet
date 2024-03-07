@@ -49,7 +49,7 @@ router.put('/drivers/:id', upload.single('photo'), async (req, res) => {
         const { id } = req.params;
         const { body, file } = req;
 
-        let updatedDriver = body; // No es necesario JSON.parse si ya recibes un objeto
+        let updatedDriver = body; 
 
         if (file) {
             const photoName = `drivers/${Date.now()}_${file.originalname}`;
