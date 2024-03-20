@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>364633043807-c0bptpv34g563u58fk5u2qci86h8ri7v.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.364633043807-c0bptpv34g563u58fk5u2qci86h8ri7v</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>364633043807-ao1j569621givu5mfksj843v9c4udjot.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyBY57FWBiwHVFO8hyF_d86NP41wg2IpyKY</string>
+	<key>GCM_SENDER_ID</key>
+	<string>364633043807</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.driversapp2</string>
+	<key>PROJECT_ID</key>
+	<string>apiflet</string>
+	<key>STORAGE_BUCKET</key>
+	<string>apiflet.appspot.com</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:364633043807:ios:e8cfde3358d0b84f833cea</string>
+	<key>DATABASE_URL</key>
+	<string>https://apiflet-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>

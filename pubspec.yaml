@@ -1,0 +1,57 @@
+name: driversapp2
+description: "A new Flutter project."
+
+# Prevent accidental publishing to pub.dev.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.4 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+    
+  cupertino_icons: ^1.0.2
+  connectivity_plus:
+  firebase_core: ^2.25.4
+  firebase_auth:
+  firebase_database:
+  firebase_storage:
+  google_maps_flutter:
+  permission_handler:
+  geolocator:
+  image_picker:
+  provider:
+  google_place:
+  line_awesome_flutter:
+  geocoding: ^2.1.1
+  cached_network_image: ^3.3.1
+  flutter_stripe: ^10.0.0
+  cloud_firestore: ^4.15.5
+  flutter_polyline_points: ^1.0.0
+  firebase_messaging: ^14.7.17
+  fl_chart: ^0.66.2
+  flutter_map_location_marker: ^6.0.0
+  location: ^5.0.3
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Enable generation of localized Strings from arb files.
+  generate: true
+
+  assets:
+    # Add assets from the images directory to the application.
+    - assets/images/
+    - assets/themes/
+    - themes/
+
