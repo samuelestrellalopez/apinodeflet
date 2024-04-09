@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
+import 'package:driversapp2/pages/detalle_pago_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,10 @@ import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:driversapp2/pages/drawer.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 import 'package:http/http.dart' as http;
 
 void main() {
@@ -22,6 +27,7 @@ class HomePage extends StatefulWidget {
 
   @override
   State<HomePage> createState() => _HomePageState();
+  
 }
 
 class _HomePageState extends State<HomePage> {
@@ -47,6 +53,12 @@ bool _showFletesPendientesButton = true;
   bool _showContinueToDeliveryButton = false; // Variable para controlar la visibilidad del botón "Continuar a la entrega"
   bool _showDashboard = true; // Estado para controlar la visibilidad del Dashboard
 bool _showFinishDeliveryButton = false;
+final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+bool _showProfileImage = true; // Inicialmente visible
+bool _showDriverPhoto = true; // Variable para controlar la visibilidad de la foto del conductor
+bool _showContinueToDeliveryButton2 = false;
+
+StreamController<LatLng> _driverLocationStreamController = StreamController<LatLng>();
 
   @override
   void initState() {
@@ -54,9 +66,13 @@ bool _showFinishDeliveryButton = false;
     _initializeCurrentUser();
     WidgetsBinding.instance?.addPostFrameCallback((_) {
       _getFletesFromFirebase();
+      
     });
     _startTrip(); // Llama a la función _startTrip() aquí
+    
   }
+
+  
 
   void _initializeCurrentUser() {
     _currentUser = FirebaseAuth.instance.currentUser;
@@ -216,15 +232,59 @@ void _getFletesFromFirebase() async {
 }
 
 
+  late String userEmail = "";
+  late String userPhotoUrl = "";
+String? _startAddress;
+String? _endAddress;
+String? _userName;
+String? _userSurname;
+String? _time;
+String? _number;
+String? _state;
+String? _fleteId; // Declaración de la variable _fleteId
+String? _offerRate;
+
+Future<String> _loadDriverImage() async {
+  try {
+    DatabaseReference userRef = FirebaseDatabase.instance
+        .ref()
+        .child("Drivers")
+        .child(FirebaseAuth.instance.currentUser!.uid);
+
+    // Utiliza el método once().then() para obtener el DataSnapshot del evento
+    DataSnapshot snapshot = await userRef.once().then((event) {
+      return event.snapshot;
+    });
+
+    if (snapshot.value != null) {
+      // Obtén la URL de la imagen del conductor desde los datos obtenidos
+      String? photoUrl = (snapshot.value as Map)["photo"];
+      return photoUrl ?? ""; // Devuelve la URL de la imagen o una cadena vacía si no hay URL disponible
+    } else {
+      print("No se encontraron datos para el conductor.");
+      return ""; // Devuelve una cadena vacía si no se encontraron datos
+    }
+  } catch (e) {
+    print("Error al cargar la imagen del conductor: $e");
+    return ""; // Devuelve una cadena vacía en caso de error
+  }
+}
+
 @override
 Widget build(BuildContext context) {
     Size screenSize = MediaQuery.of(context).size;
+      const double cardHeight = 250; 
+
   return Positioned.fill(
     child: Scaffold(
-      appBar: AppBar(
-        title: Text("FleT", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.orangeAccent)),
-        automaticallyImplyLeading: false,
-      ),
+    key: _scaffoldKey, // Asigna la clave global al Scaffold
+
+      // appBar: AppBar(
+      //   title: Text("FleT", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.orangeAccent)),
+      //   automaticallyImplyLeading: false,
+      // ),
+      drawer: DrawerWidget(), // Aquí incluye tu Drawer
+
       body: Stack(
         children: [
           GoogleMap(
@@ -240,173 +300,660 @@ Widget build(BuildContext context) {
             rotateGesturesEnabled: true, // Habilita la rotación del mapa mediante gestos
             zoomControlsEnabled: false, // Desactivar los botones de zoom predeterminados
           ),
-          Visibility(
-            visible: _showFletesPendientesButton,
-            child: Positioned(
-              left: 20,
-              top: 20,
-              child: FloatingActionButton.extended(
-                onPressed: () {},
-                label: Text(
-                  'Fletes Pendientes',
-                  style: TextStyle(color: Colors.white),
-                ),
-                icon: Icon(Icons.list),
-                backgroundColor: Colors.orange,
-              ),
-            ),
+Visibility(
+  visible: _showFletesPendientesButton,
+  child: Positioned(
+    left: 30, // Posicionar un poco más hacia la derecha
+    bottom: 60, // Subir un poco más desde el borde inferior
+    child: SizedBox(
+      width: 70, // Hacer el botón un poco más grande
+      height: 70,
+      child: FloatingActionButton(
+        onPressed: () {
+                  _showPendingFletes(); // Mostrar fletes pendientes al presionar el botón flotante
+
+        }, // Mantener la misma acción o agregar la lógica necesaria
+        backgroundColor: Colors.orange,
+        child: Icon(Icons.list), // Usar solo el icono sin texto
+        shape: CircleBorder(), // Hacer que el botón sea redondo
+      ),
+    ),
+  ),
+),
+
+
+Visibility(
+  visible: _showProfileImage,
+  child: Positioned(
+    left: 20,
+    top: 80,
+    child: GestureDetector(
+      onTap: () {
+        try {
+          _scaffoldKey.currentState?.openDrawer();
+        } catch (e) {
+          print('Error al abrir el Drawer: $e');
+        }
+      },
+      child: Container(
+        width: 70,
+        height: 70,
+        padding: EdgeInsets.all(1),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(35),
+          border: Border.all(
+            color: Color.fromARGB(255, 255, 255, 255),
+            width: 2,
           ),
-          Positioned(
-            top: 20,
-            right: 20,
+        ),
+        child: FutureBuilder<String>(
+          future: _loadDriverImage(), // Llama al método para cargar la imagen del conductor
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.done) {
+              // Si la carga de la imagen está completa, muestra la imagen del conductor
+              return ClipOval(
+                child: Image.network(
+                  snapshot.data ?? "", // Utiliza la URL de la imagen del conductor obtenida del futuro
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.cover,
+                ),
+              );
+            } else {
+              // Muestra un indicador de carga mientras se carga la imagen
+              return Center(
+                child: CircularProgressIndicator(),
+              );
+            }
+          },
+        ),
+      ),
+    ),
+  ),
+),
+
+
+ Positioned(
+  bottom: _showContinueToDeliveryButton || _showFinishDeliveryButton || _showContinueToDeliveryButton2 ? cardHeight + 20 : 80, // Ajusta este valor según la visibilidad de la card
+  right: 20, 
+  child: Column(
+    children: [
+      SizedBox(
+        width: 50,
+        height: 50,
+        child: FloatingActionButton(
+          onPressed: _getCurrentLiveLocationOfDriver,
+          backgroundColor: Colors.white,
+          child: Icon(Icons.gps_fixed, color: Colors.orange),
+        ),
+      ),
+    ],
+  ),
+),
+
+if (_showStartTripButton)
+  Positioned(
+    top: 30,
+    left: 20,
+    right: 20,
+    child: Container(
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: ui.Color.fromARGB(255, 94, 94, 94).withOpacity(0.8),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.green,
+            ),
+            margin: EdgeInsets.only(right: 8),
+          ),
+          Expanded(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                FloatingActionButton(
-                  onPressed: () {
-                    _googleMapController?.animateCamera(CameraUpdate.zoomIn());
+                FutureBuilder(
+                  future: _getUserDetails(_selectedFleteInfo?['userId'] ?? ""),
+                  builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    } else {
+                      if (snapshot.hasError) {
+                        return Text(
+                          'Error: ${snapshot.error}',
+                          style: TextStyle(color: Colors.white),
+                        );
+                      } else {
+                        Map<String, dynamic>? userDetails = snapshot.data;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedFleteInfo?['startAddress'] ?? "",
+                              style: TextStyle(color: Colors.white),
+                              textAlign: TextAlign.start,
+                            ),
+                            SizedBox(height: 5),
+                            Text(
+                              "${userDetails?['name']} ${userDetails?['surname']}",
+                              style: TextStyle(color: Colors.orange),
+                            ),
+                          ],
+                        );
+                      }
+                    }
                   },
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.add,
-                    color: Colors.orange,
-                  ),
-                ),
-                SizedBox(height: 10),
-                FloatingActionButton(
-                  onPressed: () {
-                    _googleMapController?.animateCamera(CameraUpdate.zoomOut());
-                  },
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.remove,
-                    color: Colors.orange,
-                  ),
-                ),
-                SizedBox(height: 10),
-                FloatingActionButton(
-                  onPressed: () {
-                    _getCurrentLiveLocationOfDriver();
-                  },
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.gps_fixed,
-                    color: Colors.orange,
-                  ),
                 ),
               ],
             ),
           ),
-          if (_showStartTripButton) 
-            Positioned(
-              bottom: 20,
-              right: 20, 
-              child: ElevatedButton(
-                onPressed: () { 
-                  _tripStarted = true;  
-                  _startTrip();
-                  _showFletesPendientesButton = false;
-                    //  Navigator.push(
-                    //     context,
-                    //     MaterialPageRoute(builder: (context) => HomePage()),
-                    //   );
-                },
-                style: ElevatedButton.styleFrom(
-                  primary: Colors.orange,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10), // Define los bordes redondeados
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(10.0), // Ajusta el relleno del botón según sea necesario
-                  child: Text(
-                    'Iniciar viaje',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _showStartTripButton = false;
+              });
+              _tripStarted = true;
+              _startTrip();
+              _showFletesPendientesButton = false;
+              
+            },
+            child: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.orange,
+              ),
+              child: Icon(
+                Icons.arrow_forward,
+                color: Colors.white,
               ),
             ),
+          ),
+        ],
+      ),
+    ),
+  ),
           if (_showStartTripButton2) 
-            Positioned(
-              bottom: 20,
-              right: 20, 
-              child: ElevatedButton(
-             onPressed: () {
-                  _tripStarted = true;  
-                  _startTrip3();
-                  _showFletesPendientesButton = false;
-
-                  // Cambia el estado de la variable para mostrar el nuevo botón
-                  setState(() {
-                    _showFinishDeliveryButton = true;
+  Positioned(
+    top: 30,
+    left: 20,
+    right: 20,
+    child: Container(
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: ui.Color.fromARGB(255, 94, 94, 94).withOpacity(0.8),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.green,
+            ),
+            margin: EdgeInsets.only(right: 8),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FutureBuilder(
+                  future: _getUserDetails(_selectedFleteInfo?['userId'] ?? ""),
+                  builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    } else {
+                      if (snapshot.hasError) {
+                        return Text(
+                          'Error: ${snapshot.error}',
+                          style: TextStyle(color: Colors.white),
+                        );
+                      } else {
+                        Map<String, dynamic>? userDetails = snapshot.data;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedFleteInfo?['endAddress'] ?? "",
+                              style: TextStyle(color: Colors.white),
+                              textAlign: TextAlign.start,
+                            ),
+                            SizedBox(height: 5),
+                            Text(
+                              "${userDetails?['name']} ${userDetails?['surname']}",
+                              style: TextStyle(color: Colors.orange),
+                            ),
+                          ],
+                        );
+                      }
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+  _showFinishDeliveryButton = true;
+  _showContinueToDeliveryButton2= false;
                               _showStartTripButton2 = false;
+              });
+              _startTrip3();
+              _showFletesPendientesButton = false;
+              _tripStarted = true;
+            },
+            child: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.orange,
+              ),
+              child: Icon(
+                Icons.arrow_forward,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
 
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  primary: Colors.orange,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10), // Define los bordes redondeados
+
+
+
+  if (_showFinishDeliveryButton) 
+ Positioned(
+    bottom: 20,
+    left: 20,
+    right: 20,
+    child: Card(
+      color: Colors.black87, // Color oscuro al estilo Uber
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Rumbo al Destino de entrega",
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+            SizedBox(height: 8),
+            Text(
+              "Dirigete a(l) $_endAddress", // Asume que $_time es una variable ya definida
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+            SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundImage: AssetImage('assets/images/perfil.png'),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    "$_userName", // Supone que _userName es una variable ya definida
+                    style: TextStyle(color: Colors.white, fontSize: 16),
                   ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(10.0), // Ajusta el relleno del botón según sea necesario
-                  child: Text(
-                    'Iniciar al punto de entrega',
-                    style: TextStyle(color: Colors.white),
+                GestureDetector(
+                  onTap: () {
+                    String phoneNumber = '$_number'; // Asigna aquí el número de teléfono del usuario
+                    _launchPhoneCall(phoneNumber);
+                  },
+                  child: CircleAvatar(
+                    backgroundColor: Colors.orange,
+                    child: Icon(Icons.phone, color: Colors.white),
                   ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16),
+           GestureDetector(
+  onTap: () async {
+    try {
+      // Construye la URL para actualizar el estado del flete
+      String apiUrl = 'https://webapi-fletmin2.onrender.com/api/fletes/$_fleteId';
+      
+      // Crea un mapa con el nuevo estado del flete
+      Map<String, dynamic> requestBody = {
+        'state': 'En Destino',
+      };
+
+      // Realiza la solicitud PUT a la API para actualizar el estado dAel flete
+      var response = await http.put(
+        Uri.parse(apiUrl),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Verifica si la solicitud fue exitosa
+      if (response.statusCode == 200) {
+        // Si la solicitud fue exitosa, actualiza el estado local
+        setState(() {
+          _state = 'En Destino';
+         _showStartTripButton2 = false;
+        _showTripStatusCard(context);
+        });
+        
+        // Muestra un mensaje de éxito
+             ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Espera a recoger el paquete y continua".'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 7), // Establece la duración del SnackBar en 7 segundos
+        ),
+      );
+
+      } else {
+        // Si la solicitud no fue exitosa, muestra un mensaje de error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al actualizar el estado del flete.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (error) {
+      // Maneja cualquier error que ocurra durante la solicitud
+      print('Error: $error');
+    }
+  },
+              child: Container(
+                alignment: Alignment.center,
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.yellow,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  "Llegue a la entrega",
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
             ),
-            if (_showFinishDeliveryButton) 
-  Positioned(
-    bottom: 20,
-    right: 20, 
-    child: ElevatedButton(
-   onPressed: () {
-        setState(() {
-          _showStartTripButton2 = false;
-        });
-        _showTripStatusBottomSheet(context);
-      },
-      style: ElevatedButton.styleFrom(
-        primary: Colors.orange,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          ],
         ),
       ),
-      child: Padding( 
-        padding: const EdgeInsets.all(10.0), 
-        child: Text(
-          'Finalizar Entrega',
-          style: TextStyle(color: Colors.white),
-        ),
-      ),),),
-            
-          if (_showContinueToDeliveryButton) // Nuevo botón "Continuar a la entrega"
-            Positioned(
-              bottom: 20,
-              right: 20, // Cambia la posición del botón de continuar a la entrega a la esquina inferior derecha
-              child: ElevatedButton(
-                onPressed: () {
-                   _tripStarted = false;  
-                  _startTrip2();
-                  _showFletesPendientesButton = false;       
-                  },
-                style: ElevatedButton.styleFrom(
-                  primary: Colors.orange,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10), // Define los bordes redondeados
+    ),
+  ),
+  
+
+if (_showContinueToDeliveryButton)
+  Positioned(
+    bottom: 20,
+    left: 20,
+    right: 20,
+    child: Card(
+      color: Colors.black87, // Color oscuro al estilo Uber
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Rumbo al punto de encuentro",
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+            SizedBox(height: 8),
+            Text(
+              "Llega antes de la(s) $_time", // Asume que $_time es una variable ya definida
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+            SizedBox(height: 16),
+            //    Text(
+            //   "Vas $_state", // Asume que $_time es una variable ya definida
+            //   style: TextStyle(color: Colors.white70, fontSize: 16),
+            // ),
+            // SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundImage: AssetImage('assets/images/perfil.png'),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    "$_userName", // Supone que _userName es una variable ya definida
+                    style: TextStyle(color: Colors.white, fontSize: 16),
                   ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(10.0), // Ajusta el relleno del botón según sea necesario
-                  child: Text(
-                    'Mostrar Siguiente Recorrido',
-                    style: TextStyle(color: Colors.white),
+                GestureDetector(
+                  onTap: () {
+                    String phoneNumber = '$_number'; // Asigna aquí el número de teléfono del usuario
+                    _launchPhoneCall(phoneNumber);
+                  },
+                  child: CircleAvatar(
+                    backgroundColor: Colors.orange,
+                    child: Icon(Icons.phone, color: Colors.white),
                   ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16),
+  GestureDetector(
+  onTap: () async {
+    try {
+      // Construye la URL para actualizar el estado del flete
+      String apiUrl = 'https://webapi-fletmin2.onrender.com/api/fletes/$_fleteId';
+      
+      // Crea un mapa con el nuevo estado del flete
+      Map<String, dynamic> requestBody = {
+        'state': 'Recogiendo',
+      };
+
+      // Realiza la solicitud PUT a la API para actualizar el estado dAel flete
+      var response = await http.put(
+        Uri.parse(apiUrl),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Verifica si la solicitud fue exitosa
+      if (response.statusCode == 200) {
+        // Si la solicitud fue exitosa, actualiza el estado local
+        setState(() {
+          _state = 'Recogiendo';
+          _showContinueToDeliveryButton2 = true;
+          _showContinueToDeliveryButton = false;
+        });
+        
+        // Muestra un mensaje de éxito
+             ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Espera a recoger el paquete y continua".'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 7), // Establece la duración del SnackBar en 7 segundos
+        ),
+      );
+
+      } else {
+        // Si la solicitud no fue exitosa, muestra un mensaje de error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al actualizar el estado del flete.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (error) {
+      // Maneja cualquier error que ocurra durante la solicitud
+      print('Error: $error');
+    }
+  },
+              child: Container(
+                alignment: Alignment.center,
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.yellow,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  "Llegué por el Pedido",
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    ),
+  ),
+  
+  if (_showContinueToDeliveryButton2)
+  Positioned(
+    bottom: 20,
+    left: 20,
+    right: 20,
+    child: Card(
+      color: Colors.black87, // Color oscuro al estilo Uber
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Recogiendo paquete",
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+            SizedBox(height: 8),
+            Text(
+              "Continua al punto de Destino cuando tengas el paquete", // Asume que $_time es una variable ya definida
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+            SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundImage: AssetImage('assets/images/perfil.png'),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    "$_userName", // Supone que _userName es una variable ya definida
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    String phoneNumber = '$_number'; // Asigna aquí el número de teléfono del usuario
+                    _launchPhoneCall(phoneNumber);
+                  },
+                  child: CircleAvatar(
+                    backgroundColor: Colors.orange,
+                    child: Icon(Icons.phone, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16),
+            GestureDetector(
+              onTap: () async {
+    try {
+      // Construye la URL para actualizar el estado del flete
+      String apiUrl = 'https://webapi-fletmin2.onrender.com/api/fletes/$_fleteId';
+      
+      // Crea un mapa con el nuevo estado del flete
+      Map<String, dynamic> requestBody = {
+        'state': 'Al destino',
+      };
+
+      // Realiza la solicitud PUT a la API para actualizar el estado del flete
+      var response = await http.put(
+        Uri.parse(apiUrl),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Verifica si la solicitud fue exitosa
+      if (response.statusCode == 200) {
+        // Si la solicitud fue exitosa, actualiza el estado local
+        setState(() {
+          _state = 'Al Destino';
+           _tripStarted = false;
+                _startTrip2();
+                _showFletesPendientesButton = false;
+                _showContinueToDeliveryButton = false; // Ocultar la tarjeta después de la acción
+                _showContinueToDeliveryButton2 = false;
+        });
+        
+        // Muestra un mensaje de éxito
+             ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Viaje comenzado al punto de destino.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      } else {
+        // Si la solicitud no fue exitosa, muestra un mensaje de error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al actualizar el estado del flete.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (error) {
+      // Maneja cualquier error que ocurra durante la solicitud
+      print('Error: $error');
+    }
+  },
+              child: Container(
+                alignment: Alignment.center,
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.yellow,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  "Continuar",
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  )
+  
+
+
         ],
       ),
     ),
@@ -415,106 +962,300 @@ Widget build(BuildContext context) {
 
 
 
-void _showTripStatusBottomSheet(BuildContext context) {
+
+
+
+ void _showPendingFletes() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Color.fromARGB(255, 255, 255, 255), // Establecer el color de fondo blanco
+          title: Text(
+            "Fletes Pendientes",
+            style: TextStyle(color: Colors.black), // Texto en negro
+          ),
+          content: Container(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _pendingFletes.length,
+              itemBuilder: (BuildContext context, int index) {
+                return _buildFleteCard(_pendingFletes[index]);
+              },
+            ),
+          ),
+          actions: <Widget>[
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                primary: Colors.orange, // Fondo naranja
+                onPrimary: Colors.white, // Texto en blanco
+              ),
+              child: Text("Cerrar"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFleteCard(Map<dynamic, dynamic> fleteInfo) {
+    return Card(
+      elevation: 2.0,
+      margin: EdgeInsets.symmetric(vertical: 5.0),
+      child: ListTile(
+        title: Text(fleteInfo['date'] ?? ""),
+        subtitle: Text("Hora: ${fleteInfo['time']}, Tarifa: ${fleteInfo['offerRate']}"),
+        onTap: () {
+          // Acción al presionar el flete pendiente
+          Navigator.of(context).pop(); // Cerrar el diálogo de fletes pendientes
+          _showFleteDetailsModal(fleteInfo); // Mostrar detalles del flete
+        },
+      ),
+    );
+  }
+
+  void _showFleteDetailsModal(Map<dynamic, dynamic> fleteInfo) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white, // Aquí estableces el color de fondo
+          title: Text(
+            "Detalles del Flete",
+            style: TextStyle(color: Colors.black),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildInfoRow('Descripción', fleteInfo['description'] ?? ""),
+                _buildInfoRow('Fecha', fleteInfo['date'] ?? ""),
+                _buildInfoRow('Dirección de inicio', fleteInfo['startAddress'] ?? ""),
+                _buildInfoRow('Dirección de entrega', fleteInfo['endAddress'] ?? ""),
+                _buildInfoRow('Hora', fleteInfo['time'] ?? ""),
+                _buildInfoRow('Tipo de vehículo', fleteInfo['vehicleType'] ?? ""),
+                _buildInfoRow('Pago', fleteInfo['offerRate'] ?? ""),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Cerrar el diálogo de detalles del flete
+                _showPendingFletes(); // Mostrar la lista de fletes pendientes nuevamente
+              },
+              style: ElevatedButton.styleFrom(
+                primary: Colors.orange,
+                onPrimary: Colors.white,
+              ),
+              child: Text("Regresar"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Cerrar el diálogo de detalles del flete
+                showModalBottomSheet(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return _buildSecondModal();
+                  },
+                );
+              },
+                
+              style: ElevatedButton.styleFrom(
+                primary: Colors.orange,
+                onPrimary: Colors.white,
+              ),
+              child: Text("Continuar"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+Widget _buildSecondModal() {
+  return Container(
+    width: MediaQuery.of(context).size.width * 0.9,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(20),
+        topRight: Radius.circular(20),
+      ),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(height: 20),
+        Row(
+          children: [
+            _buildProgressBarSegment(Colors.green, 0.30),
+            _buildProgressBarSegment(Color.fromARGB(255, 229, 229, 229), 0.05),
+            _buildProgressBarSegment(Colors.green, 0.15),
+            _buildProgressBarSegment(Color.fromARGB(255, 223, 223, 223), 0.05),
+            _buildProgressBarSegment(Colors.green, 0.25),
+          ],
+        ),
+        SizedBox(height: 20),
+        Image.asset(
+          'assets/images/reparti.png',
+          width: 100,
+          height: 100,
+        ),
+        SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: () {
+          },
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            primary: Colors.transparent,
+            elevation: 0,
+          ),
+          child: Ink(
+            child: InkWell(
+              onTap: () {
+              },
+              child: Container(
+                width: 200,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.orange, Colors.amber],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: EdgeInsets.symmetric(vertical: 15),
+                child: Center(
+                  child: Text(
+                    'Comenzar recorrido',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.of(context).pop(); // Cerrar el diálogo de detalles del flete
+            _showPendingFletes(); // Mostrar la lista de fletes pendientes nuevamente
+          },
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            primary: Colors.transparent,
+            elevation: 0,
+          ),
+          child: Ink(
+            child: InkWell(
+              onTap: () {
+                Navigator.of(context).pop(); // Cerrar el diálogo de detalles del flete
+                _showPendingFletes(); // Mostrar la lista de fletes pendientes nuevamente
+              },
+              child: Container(
+                width: 200,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.orange, Colors.amber],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: EdgeInsets.symmetric(vertical: 15),
+                child: Center(
+                  child: Text(
+                    'Regresar',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: 20),
+      ],
+    ),
+  );
+}
+
+
+
+
+
+
+
+
+
+_launchPhoneCall(String phoneNumber) async {
+  String url = 'tel:$phoneNumber';
+  if (await canLaunch(url)) {
+    await launch(url);
+  } else {
+    throw 'No se pudo iniciar la llamada: $url';
+  }
+}
+
+void _showTripStatusCard(BuildContext context) {
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     builder: (BuildContext context) {
-      return DraggableScrollableSheet(
-        initialChildSize: 0.2,
-        maxChildSize: 0.5,
-        minChildSize: 0.2,
-        builder: (BuildContext context, ScrollController scrollController) {
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(10.0),
-                topRight: Radius.circular(10.0),
-              ),
+      return SingleChildScrollView(
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.3, // Abre la ventana en menos de la mitad pero se muestra completa
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(10.0),
+              topRight: Radius.circular(10.0),
             ),
-            child: SingleChildScrollView(
-              controller: scrollController,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(height: 10.0),
-                  Container(
-                    alignment: Alignment.center,
-                    child: Text(
-                      'Viaje en curso',
-                      style: TextStyle(
-                        fontSize: 20.0,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(height: 10.0),
+              Container(
+                alignment: Alignment.center,
+                child: Text(
+                  'Flete en curso...',
+                  style: TextStyle(
+                    fontSize: 20.0,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
                   ),
-                  SizedBox(height: 20.0),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(8.0),
-                          decoration: BoxDecoration(
-                            color: Colors.blue,
-                            borderRadius: BorderRadius.circular(5.0),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.credit_card,
-                                color: Colors.white,
-                              ),
-                              SizedBox(width: 5.0),
-                              Text(
-                                'Pago en tarjeta',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 20.0),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: Container(
-                      width: double.infinity,
+                ),
+              ),
+              SizedBox(height: 20.0),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8.0),
                       decoration: BoxDecoration(
-                        color: Colors.orange,
-                        borderRadius: BorderRadius.circular(20.0),
+                        color: Colors.blue,
+                        borderRadius: BorderRadius.circular(5.0),
                       ),
-                      padding: EdgeInsets.all(10.0),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            width: 40.0,
-                            height: 40.0,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Icon(
-                                Icons.arrow_forward_ios,
-                                color: Colors.orange,
-                              ),
-                            ),
+                          Icon(
+                            Icons.credit_card,
+                            color: Colors.white,
                           ),
-                          SizedBox(width: 10.0),
+                          SizedBox(width: 5.0),
                           Text(
-                            'Finalizar Viaje',
+                            'Pago en tarjeta',
                             style: TextStyle(
                               color: Colors.white,
                             ),
@@ -522,19 +1263,145 @@ void _showTripStatusBottomSheet(BuildContext context) {
                         ],
                       ),
                     ),
-                  ),
-                  SizedBox(height: 10.0),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
+              SizedBox(height: 20.0),
+            GestureDetector(
+  onTap: () async {
+    try {
+      // Construye la URL para actualizar el estado del flete
+      String apiUrl = 'https://webapi-fletmin2.onrender.com/api/fletes/$_fleteId';
+      
+      // Crea un mapa con el nuevo estado del flete
+      Map<String, dynamic> requestBody = {
+        'state': 'Finalizado',
+      };
+
+      // Realiza la solicitud PUT a la API para actualizar el estado del flete
+      var response = await http.put(
+        Uri.parse(apiUrl),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
         },
+        body: jsonEncode(requestBody),
+      );
+
+      // Verifica si la solicitud fue exitosa
+      if (response.statusCode == 200) {
+        // Si la solicitud fue exitosa, actualiza el estado local
+        setState(() {
+          _state = 'Finalizado';
+          _showContinueToDeliveryButton2 = false; // Oculta el botón de continuar
+        });
+        
+        // Muestra un mensaje de éxito
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Flete finalizado exitosamente.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+double offerRate = double.tryParse(_offerRate ?? '') ?? 0;
+
+        // Navega a la página DetallePagoPage
+       Navigator.push(
+    context,
+    MaterialPageRoute(
+    builder: (context) => DetallePagoPage(offerRate: offerRate),
+    ),
+  );
+
+      } else {
+        // Si la solicitud no fue exitosa, muestra un mensaje de error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al finalizar el flete.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (error) {
+      // Maneja cualquier error que ocurra durante la solicitud
+      print('Error: $error');
+    }
+  },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Card(
+                    elevation: 8.0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20.0),
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.yellow,
+                        borderRadius: BorderRadius.circular(20.0),
+                      ),
+                      padding: EdgeInsets.all(10.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: Colors.green,
+                            size: 30.0,
+                          ),
+                          SizedBox(width: 10.0),
+                          Text(
+                            'Finalizar Flete',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 16.0,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: 10.0),
+            ],
+          ),
+        ),
       );
     },
   );
-}
+} 
+
+  void _acceptFlete2(Map<dynamic, dynamic> fleteInfo, String fleteId) {
+    DatabaseReference databaseReference =
+        FirebaseDatabase.instance.reference().child('Fletes');
+
+    String driverId = _currentUser!.uid;
+
+    databaseReference.child(fleteId).update({
+      'state': 'Recogiendo',
+    }).then((_) {
+      print('Flete Recogido con éxito');
+    }).catchError((error) {
+      print('Error al Recoger el flete: $error');
+    });
+  }
+
+
+
+
+
+  
+
+
 
 void _getCurrentLiveLocationOfDriver() async {
+    Position positionOfDriver = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.bestForNavigation);
+
+  LatLng driverPosition = LatLng(positionOfDriver.latitude, positionOfDriver.longitude);
+  
+  _driverLocationStreamController.add(driverPosition);
+  
   Position positionOfUser = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.bestForNavigation);
   _currentPositionOfUser = positionOfUser;
@@ -563,128 +1430,151 @@ void _showFleteInfoModal(Map<dynamic, dynamic> fleteInfo, String fleteId) async 
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.transparent,
     builder: (BuildContext context) {
       return FutureBuilder(
         future: _getUserDetails(fleteInfo['userId']),
         builder: (BuildContext context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return Center(
+              child: CircularProgressIndicator(),
+            );
           } else {
             if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}'));
+              return Center(
+                child: Text('Error: ${snapshot.error}'),
+              );
             } else {
               Map<String, dynamic>? userDetails = snapshot.data;
-              return SingleChildScrollView(
-                child: Container(
-                  padding: EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Detalles del Usuario',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                  ListTile(
-                      leading: Icon(Icons.insert_drive_file, color: Colors.orange),
-                      title: Text('Nombre completo:', style: TextStyle(color: Colors.black)),
-                      subtitle: Text('${userDetails?['name']} ${userDetails?['surname']}' ?? "", style: TextStyle(color: Color.fromARGB(255, 30, 20, 0))),
-                      trailing: userDetails?['photo'] != null
-                          ? CircleAvatar(
-                              radius: 30,
-                              backgroundImage: NetworkImage(userDetails?['photo']),
-                            )
-                          : null,
+              return ClipRRect(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                child: SingleChildScrollView(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                     ),
-                    ListTile(
-                      leading: Icon(Icons.phone, color: Colors.orange),
-                      title: Text('Número:', style: TextStyle(color: Colors.black)),
-                      subtitle: Text(userDetails?['number'] ?? "", style: TextStyle(color: Color.fromARGB(255, 30, 20, 0))),
-                    ),
-                      Text(
-                        'Detalles del Flete',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      SizedBox(height: 20),
-                      ListTile(
-                        leading: Icon(Icons.description, color: Colors.orange),
-                        title: Text('Descripción:', style: TextStyle(color: Colors.black)),
-                        subtitle: Text(fleteInfo['description'] ?? "", style: TextStyle(color: Color.fromARGB(255, 30, 20, 0))),
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.calendar_today, color: Colors.orange),
-                        title: Text('Fecha:', style: TextStyle(color: Colors.black)),
-                        subtitle: Text(fleteInfo['date'] ?? "", style: TextStyle(color: Color.fromARGB(255, 30, 20, 0))),
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.location_on, color: Colors.orange),
-                        title: Text('Dirección de inicio:', style: TextStyle(color: Colors.black)),
-                        subtitle: Text(fleteInfo['startAddress'] ?? "", style: TextStyle(color: Color.fromARGB(255, 30, 20, 0))),
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.location_on, color: Colors.orange),
-                        title: Text('Dirección de entrega:', style: TextStyle(color: Colors.black)),
-                        subtitle: Text(fleteInfo['endAddress'] ?? "", style: TextStyle(color: Color.fromARGB(255, 30, 20, 0))),
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.access_time, color: Colors.orange),
-                        title: Text('Hora:', style: TextStyle(color: Colors.black)),
-                        subtitle: Text(fleteInfo['time'] ?? "", style: TextStyle(color: Color.fromARGB(255, 30, 20, 0))),
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.local_shipping, color: Colors.orange),
-                        title: Text('Tipo de vehículo:', style: TextStyle(color: Colors.black)),
-                        subtitle: Text(fleteInfo['vehicleType'] ?? "", style: TextStyle(color: Color.fromARGB(255, 30, 20, 0))),
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.attach_money, color: Colors.orange),
-                        title: Text('Pago:', style: TextStyle(color: Colors.black)),
-                        subtitle: Text(fleteInfo['offerRate'] ?? "", style: TextStyle(color: Color.fromARGB(255, 30, 20, 0))),
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          ElevatedButton(
-                            onPressed: () {
-                              _acceptFlete(fleteInfo, fleteId); // Acepta el flete
-                              Navigator.of(context).pop();
-                              setState(() {
-                                _showTriangularWindow = true;
-                                _selectedFleteInfo = fleteInfo;
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              primary: Colors.orange,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [const ui.Color.fromARGB(255, 255, 123, 0), Colors.yellow],
                             ),
-                            child: Text(
-                              'Aceptar Flete',
-                              style: TextStyle(color: Colors.white),
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Flete disponible',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(height: 10),
+                                ListTile(
+                                  leading: userDetails?['photo'] != null
+                                      ? CircleAvatar(
+                                          radius: 30,
+                                          backgroundImage: NetworkImage(userDetails?['photo']),
+                                        )
+                                      : Icon(Icons.account_circle, size: 60, color: Colors.orange),
+                                  title: Text(
+                                    '${userDetails?['name']} ${userDetails?['surname']}' ?? "",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                  subtitle: Text(userDetails?['number'] ?? "", style: TextStyle(color: Colors.white)),
+                                ),
+                              ],
                             ),
                           ),
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              primary: Colors.orange,
-                            ),
-                            child: Text(
-                              'Rechazar Flete',
-                              style: TextStyle(color: Colors.white),
-                            ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Detalles del Flete',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              SizedBox(height: 10),
+                              ..._buildFleteDetails(fleteInfo, fleteId), // Función para construir los detalles del flete
+                            ],
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                            _acceptFlete(fleteInfo, fleteId); // Acepta el flete
+                                Navigator.of(context).pop();
+                                setState(() {
+                                  _showTriangularWindow = true;
+                                  _selectedFleteInfo = fleteInfo;
+                                  _startAddress = fleteInfo['startAddress'];
+                                  _endAddress = fleteInfo['endAddress'];
+                                  _state = fleteInfo['state'];
+                                  _time = fleteInfo['time'];
+                                  _userName = userDetails?['name'];
+                                  _userSurname = userDetails?['surname'];
+                                  _number = userDetails?['number'];
+                                  _fleteId = fleteId;
+                                  _offerRate = fleteInfo['offerRate'];
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                primary: Colors.orange,
+                                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                              ),
+                              child: Text(
+                                'Aceptar Flete',
+                                style: TextStyle(color: Colors.white, fontSize: 16),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                primary: Colors.orange,
+                                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                              ),
+                              child: Text(
+                                'Rechazar Flete',
+                                style: TextStyle(color: const ui.Color.fromARGB(255, 255, 255, 255), fontSize: 16),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 20),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -694,6 +1584,47 @@ void _showFleteInfoModal(Map<dynamic, dynamic> fleteInfo, String fleteId) async 
       );
     },
   );
+}
+
+List<Widget> _buildFleteDetails(Map<dynamic, dynamic> fleteInfo, String fleteId) {
+  return [
+
+    ListTile(
+      leading: Icon(Icons.description, color: Colors.orange),
+      title: Text('Descripción:', style: TextStyle(color: Colors.black)),
+      subtitle: Text(fleteInfo['description'] ?? "", style: TextStyle(color: Colors.grey)),
+    ),
+    ListTile(
+      leading: Icon(Icons.calendar_today, color: Colors.orange),
+      title: Text('Fecha:', style: TextStyle(color: Colors.black)),
+      subtitle: Text(fleteInfo['date'] ?? "", style: TextStyle(color: Colors.grey)),
+    ),
+    ListTile(
+      leading: Icon(Icons.location_on, color: Colors.orange),
+      title: Text('Dirección de inicio:', style: TextStyle(color: Colors.black)),
+      subtitle: Text(fleteInfo['startAddress'] ?? "", style: TextStyle(color: Colors.grey)),
+    ),
+    ListTile(
+      leading: Icon(Icons.location_on, color: Colors.orange),
+      title: Text('Dirección de entrega:', style: TextStyle(color: Colors.black)),
+      subtitle: Text(fleteInfo['endAddress'] ?? "", style: TextStyle(color: Colors.grey)),
+    ),
+    ListTile(
+      leading: Icon(Icons.access_time, color: Colors.orange),
+      title: Text('Hora:', style: TextStyle(color: Colors.black)),
+      subtitle: Text(fleteInfo['time'] ?? "", style: TextStyle(color: Colors.grey)),
+    ),
+    ListTile(
+      leading: Icon(Icons.local_shipping, color: Colors.orange),
+      title: Text('Tipo de vehículo:', style: TextStyle(color: Colors.black)),
+      subtitle: Text(fleteInfo['vehicleType'] ?? "", style: TextStyle(color: Colors.grey)),
+    ),
+    ListTile(
+      leading: Icon(Icons.attach_money, color: Colors.orange),
+      title: Text('Pago:', style: TextStyle(color: Colors.black)),
+      subtitle: Text(fleteInfo['offerRate'] ?? "", style: TextStyle(color: Colors.grey)),
+    ),
+  ];
 }
 
 Future<Map<String, dynamic>> _getUserDetails(String userId) async {
@@ -727,6 +1658,8 @@ Future<Map<String, dynamic>> _getUserDetails(String userId) async {
     });
   }
 
+ 
+
 
   void _acceptFlete(Map<dynamic, dynamic> fleteInfo, String fleteId) {
     DatabaseReference databaseReference =
@@ -738,15 +1671,44 @@ Future<Map<String, dynamic>> _getUserDetails(String userId) async {
       'state': 'aceptado',
       'driverId': driverId,
     }).then((_) {
-      setState(() {
-        _pendingFletes.add(fleteInfo); // Agrega todo el flete a la lista pendiente
-      });
       print('Flete aceptado con éxito');
       _buildTriangularWindow(fleteInfo, fleteId);
     }).catchError((error) {
       print('Error al aceptar el flete: $error');
     });
   }
+  
+void _updateFlete(Map<dynamic, dynamic> fleteInfo, String fleteId) async {
+  DatabaseReference databaseReference =
+      FirebaseDatabase.instance.reference().child('Fletes');
+
+  // Cambiar el estado del flete a "En camino"
+  await databaseReference.child(fleteId).update({
+    'state': 'En camino',
+  });
+
+  // Iniciar la escucha de la ubicación del conductor y guardarla en la base de datos
+  _startLocationUpdatesForFlete(fleteId);
+
+ 
+  print('Flete en camino');
+}
+
+void _startLocationUpdatesForFlete(String fleteId) {
+  Geolocator.getPositionStream().listen((Position position) async {
+    LatLng driverPosition = LatLng(position.latitude, position.longitude);
+
+    // Actualizar la ubicación del flete en la base de datos
+    DatabaseReference databaseReference = FirebaseDatabase.instance.reference();
+    String driverId = _currentUser!.uid;
+    await databaseReference.child('Fletes/$fleteId/Location').set({
+      'latitude': driverPosition.latitude,
+      'longitude': driverPosition.longitude,
+    });
+  });
+}
+
+
 
   void _buildTriangularWindow(Map<dynamic, dynamic> fleteInfo, String fleteId) {
     showModalBottomSheet(
@@ -812,6 +1774,7 @@ Future<Map<String, dynamic>> _getUserDetails(String userId) async {
                   setState(() {
                     _showTriangularWindow = true;
                     _selectedFleteInfo = fleteInfo;
+                    _fleteId = fleteId;
                   });
                 },
                 style: ElevatedButton.styleFrom(
@@ -841,42 +1804,51 @@ Future<Map<String, dynamic>> _getUserDetails(String userId) async {
                 ),
               ),
               SizedBox(height: 10), // Espacio adicional entre botones
-              ElevatedButton(
-             onPressed: () {
-              
-    _showRouteOnMap(fleteInfo); // Llama a la función para mostrar la ruta en el mapa
-    Navigator.of(context).pop(); // Cerrar la ventana modal
-    _showFletesPendientesButton = false;
-
-    // Ocultar el Dashboard
-
+   ElevatedButton(
+  onPressed: () {
+    if (_currentPositionOfUser != null) {
+      _showRouteOnMap(fleteInfo); // Llama a la función para mostrar la ruta en el mapa
+      Navigator.of(context).pop(); // Cerrar la ventana modal
+      setState(() {
+        _updateFlete(fleteInfo, fleteId); // Solo pasamos los dos argumentos requeridos
+        _showFletesPendientesButton = false;
+        _showProfileImage = false; // Esconde el círculo de la imagen
+        // Ocultar el Dashboard
+      });
+    } else {
+      // Manejo de casos en los que la ubicación del conductor no está disponible
+      print('Error: Ubicación del conductor no disponible');
+    }
   },
-                style: ElevatedButton.styleFrom(
-                  primary: Colors.orange,
-                  padding: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Ink(
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: 15),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.orange, Colors.amber],
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Comenzar Recorrido',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+  style: ElevatedButton.styleFrom(
+    primary: Colors.orange,
+    padding: EdgeInsets.zero,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+    ),
+  ),
+
+
+  child: Ink(
+    child: Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: 15),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.orange, Colors.amber],
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Center(
+        child: Text(
+          ' Recorrido',
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+    ),
+  ),
+),
+
               SizedBox(height: 20),
             ],
           ),
@@ -1193,7 +2165,7 @@ void _showRouteOnMap2(Map<dynamic, dynamic> fleteInfo) async {
       // Mostrar el botón "Comenzar viaje" después de configurar la ruta y la cámara
 });
   }
-}
+} 
 LatLngBounds _getBoundsForCoordinates(List<LatLng> coordinates) {
   double minLat = double.infinity;
   double minLng = double.infinity;

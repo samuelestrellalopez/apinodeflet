@@ -1,4 +1,5 @@
-import 'package:driversapp2/pages/dashboard.dart';
+import 'package:driversapp2/pages/drawer.dart';
+import 'package:driversapp2/pages/home_page.dart';
 import 'package:driversapp2/widgets/loading_dialog.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -67,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (snap.snapshot.value != null) {
           if ((snap.snapshot.value as Map)["blockStatus"] == "no") {
             //userEmail = (snap.snapshot.value as Map)["email"];
-            Navigator.push(context, MaterialPageRoute(builder: (c) => Dashboard()));
+            Navigator.push(context, MaterialPageRoute(builder: (c) => HomePage()));
           } else {
             FirebaseAuth.instance.signOut();
             cMethods.displaySnackBar(

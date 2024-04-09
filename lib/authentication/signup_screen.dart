@@ -1,7 +1,8 @@
 import 'dart:io';
 
 import 'package:driversapp2/authentication/login_screen.dart';
-import 'package:driversapp2/pages/dashboard.dart';
+import 'package:driversapp2/pages/drawer.dart';
+import 'package:driversapp2/pages/home_page.dart';
 import 'package:driversapp2/widgets/loading_dialog.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -190,7 +191,7 @@ Future<void> chooseImageFromGalleryOrCamera() async {
     };
     usersRef.set(driverDataMap);
 
-    Navigator.push(context, MaterialPageRoute(builder: (c) => Dashboard()));
+    Navigator.push(context, MaterialPageRoute(builder: (c) => HomePage()));
   }
 
   @override
