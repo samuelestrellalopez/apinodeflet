@@ -3,6 +3,7 @@ const router = express.Router();
 const fleteService = require('../services/fleteService');
 const { addFlete } = require('../services/fleteService');
 const { generateToken } = require('../services/usersService');
+router.use(express.json());
 
 router.post('/fletes', async (req, res) => {
     try {
@@ -42,17 +43,11 @@ router.get('/fletes/:id', async (req, res) => {
 });
 
 
+
 router.put('/fletes/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { body } = req;
-
-        let updatedFlete;
-        try {
-            updatedFlete = JSON.parse(body);
-        } catch (error) {
-            throw new Error('Invalid JSON data in the request body');
-        }
+        const updatedFlete = req.body; // Directamente accede al cuerpo ya parseado como un objeto JavaScript
 
         await fleteService.updateFlete(id, updatedFlete);
 
@@ -62,6 +57,7 @@ router.put('/fletes/:id', async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
 
 router.delete('/fletes/:id', async (req, res) => {
     try {
@@ -75,3 +71,4 @@ router.delete('/fletes/:id', async (req, res) => {
 });
 
 module.exports = router;
+
